@@ -55,8 +55,6 @@ locals {
   common_pre_install_k3s_commands = concat(
     [
       "set -ex",
-      # rename the private network interface to eth1
-      "/etc/cloud/rename_interface.sh",
       # prepare the k3s config directory
       "mkdir -p /etc/rancher/k3s",
       # move the config file into place and adjust permissions
@@ -1187,6 +1185,7 @@ cloudinit_runcmd_common = <<EOT
 
 # Allow network interface
 - [chmod, '+x', '/etc/cloud/rename_interface.sh']
+- /etc/cloud/rename_interface.sh
 
 # Restart the sshd service to apply the new config
 - [systemctl, 'restart', 'sshd']
