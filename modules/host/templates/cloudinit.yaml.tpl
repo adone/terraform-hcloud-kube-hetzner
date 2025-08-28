@@ -2,23 +2,6 @@
 
 write_files:
 
-- path: /etc/systemd/system/static-route.service
-  permissions: '0644'
-  owner: root:root
-  content: |
-    [Unit]
-    Description=Add static default route
-    After=network-online.target
-    Wants=network-online.target
-
-    [Service]
-    Type=oneshot
-    ExecStart=/usr/sbin/ip route add default via 10.0.0.1 dev eth1 metric 100
-    RemainAfterExit=yes
-
-    [Install]
-    WantedBy=multi-user.target
-
 ${cloudinit_write_files_common}
 
 # Apply DNS config
@@ -49,12 +32,50 @@ runcmd:
 
 ${cloudinit_runcmd_common}
 
-- [ systemctl, enable, --now, static-route.service ]
+%{if private_network_only~}
+- |
+  cat >/etc/systemd/system/static-route.service <<'EOF'
+  [Unit]
+  Description=Add static default route
+  After=network-online.target
+  Wants=network-online.target
+
+  [Service]
+  Type=oneshot
+  ExecStart=/usr/sbin/ip -4 route replace default via 10.0.0.1 dev eth1 metric 100
+  RemainAfterExit=yes
+
+  [Install]
+  WantedBy=multi-user.target
+  EOF
+  systemctl daemon-reload
+  systemctl enable --now static-route.service
+%{else~}
+- |
+  cat >/etc/systemd/system/static-route.service <<'EOF'
+  [Unit]
+  Description=Add static default routes (v4+v6)
+  After=network-online.target
+  Wants=network-online.target
+
+  [Service]
+  Type=oneshot
+  # idempotent: replace if exists, add if not
+  ExecStart=/usr/sbin/ip -4 route replace default via 172.31.1.1 dev eth1 metric 100
+  ExecStart=/usr/sbin/ip -6 route replace default via fe80::1 dev eth1 metric 100
+  RemainAfterExit=yes
+
+  [Install]
+  WantedBy=multi-user.target
+  EOF
+  systemctl daemon-reload
+  systemctl enable --now static-route.service
+%{endif~}
 
 # Configure default routes based on public ip availability
 %{if private_network_only~}
-# Private-only setup: eth1 is the renamed private interface (see rename_interface.sh)
-- [ip, route, add, default, via, '10.0.0.1', dev, 'eth1', metric, '100']
+# Private-only setup: eth0 is the private interface
+- [ip, route, add, default, via, '10.0.0.1', dev, 'eth0', metric, '100']
 %{else~}
 # Standard setup: eth0 is public, configure both IPv4 and IPv6
 - [ip, route, add, default, via, '172.31.1.1', dev, 'eth0', metric, '100']
