@@ -2,6 +2,8 @@
 
 write_files:
 
+${cloudinit_write_files_common}
+
 - path: /etc/systemd/system/static-route.service
   permissions: '0644'
   owner: root:root
@@ -18,8 +20,6 @@ write_files:
 
     [Install]
     WantedBy=multi-user.target
-
-${cloudinit_write_files_common}
 
 # Apply DNS config
 %{ if has_dns_servers ~}
