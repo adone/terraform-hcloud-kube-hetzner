@@ -4,6 +4,23 @@ write_files:
 
 ${cloudinit_write_files_common}
 
+- path: /etc/systemd/system/static-route.service
+  permissions: '0644'
+  owner: root:root
+  content: |
+    [Unit]
+    Description=Add static default route
+    After=network-online.target
+    Wants=network-online.target
+
+    [Service]
+    Type=oneshot
+    ExecStart=/usr/sbin/ip route add default via 10.0.0.1 dev eth1 metric 100
+    RemainAfterExit=yes
+
+    [Install]
+    WantedBy=multi-user.target
+
 # Apply DNS config
 %{ if has_dns_servers ~}
 manage_resolv_conf: true
@@ -31,6 +48,8 @@ preserve_hostname: true
 runcmd:
 
 ${cloudinit_runcmd_common}
+
+- [ systemctl, enable, --now, static-route.service ]
 
 # Configure default routes based on public ip availability
 %{if private_network_only~}
