@@ -32,46 +32,6 @@ runcmd:
 
 ${cloudinit_runcmd_common}
 
-%{if private_network_only~}
-- |
-  cat >/etc/systemd/system/static-route.service <<'EOF'
-  [Unit]
-  Description=Add static default route
-  After=network-online.target
-  Wants=network-online.target
-
-  [Service]
-  Type=oneshot
-  ExecStart=/usr/sbin/ip -4 route replace default via 10.0.0.1 dev eth1 metric 100
-  RemainAfterExit=yes
-
-  [Install]
-  WantedBy=multi-user.target
-  EOF
-  systemctl daemon-reload
-  systemctl enable --now static-route.service
-%{else~}
-- |
-  cat >/etc/systemd/system/static-route.service <<'EOF'
-  [Unit]
-  Description=Add static default routes (v4+v6)
-  After=network-online.target
-  Wants=network-online.target
-
-  [Service]
-  Type=oneshot
-  # idempotent: replace if exists, add if not
-  ExecStart=/usr/sbin/ip -4 route replace default via 172.31.1.1 dev eth1 metric 100
-  ExecStart=/usr/sbin/ip -6 route replace default via fe80::1 dev eth1 metric 100
-  RemainAfterExit=yes
-
-  [Install]
-  WantedBy=multi-user.target
-  EOF
-  systemctl daemon-reload
-  systemctl enable --now static-route.service
-%{endif~}
-
 # Configure default routes based on public ip availability
 %{if private_network_only~}
 # Private-only setup: eth0 is the private interface
@@ -107,4 +67,43 @@ ${cloudinit_runcmd_common}
   EOF
   systemctl daemon-reload
   systemctl enable swapon-late.service
+%{endif~}
+
+%{if private_network_only~}
+- |
+  cat <<EOF>> /etc/systemd/system/static-route.service
+  [Unit]
+  Description=Add static default route
+  After=network-online.target
+  Wants=network-online.target
+
+  [Service]
+  Type=oneshot
+  ExecStart=/usr/sbin/ip -4 route replace default via 10.0.0.1 dev eth1 metric 100
+  RemainAfterExit=yes
+
+  [Install]
+  WantedBy=multi-user.target
+  EOF
+  systemctl daemon-reload
+  systemctl enable --now static-route.service
+%{else~}
+- |
+  cat <<EOF>> /etc/systemd/system/static-route.service
+  [Unit]
+  Description=Add static default routes (v4+v6)
+  After=network-online.target
+  Wants=network-online.target
+
+  [Service]
+  Type=oneshot
+  ExecStart=/usr/sbin/ip -4 route replace default via 172.31.1.1 dev eth1 metric 100
+  ExecStart=/usr/sbin/ip -6 route replace default via fe80::1 dev eth1 metric 100
+  RemainAfterExit=yes
+
+  [Install]
+  WantedBy=multi-user.target
+  EOF
+  systemctl daemon-reload
+  systemctl enable --now static-route.service
 %{endif~}
