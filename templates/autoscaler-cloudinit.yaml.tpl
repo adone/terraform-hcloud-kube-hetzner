@@ -52,3 +52,42 @@ ${cloudinit_runcmd_common}
 
 # Start the install-k3s-agent service
 - ['/bin/bash', '/var/pre_install/install-k3s-agent.sh']
+
+%{if private_network_only~}
+- |
+  cat <<EOF>> /etc/systemd/system/static-route.service
+  [Unit]
+  Description=Add static default route
+  After=network-online.target
+  Wants=network-online.target
+
+  [Service]
+  Type=oneshot
+  ExecStart=/usr/sbin/ip -4 route replace default via 10.0.0.1 dev eth1 metric 100
+  RemainAfterExit=yes
+
+  [Install]
+  WantedBy=multi-user.target
+  EOF
+  systemctl daemon-reload
+  systemctl enable --now static-route.service
+%{else~}
+- |
+  cat <<EOF>> /etc/systemd/system/static-route.service
+  [Unit]
+  Description=Add static default routes (v4+v6)
+  After=network-online.target
+  Wants=network-online.target
+
+  [Service]
+  Type=oneshot
+  ExecStart=/usr/sbin/ip -4 route replace default via 172.31.1.1 dev eth0 metric 100
+  ExecStart=/usr/sbin/ip -6 route replace default via fe80::1 dev eth0 metric 100
+  RemainAfterExit=yes
+
+  [Install]
+  WantedBy=multi-user.target
+  EOF
+  systemctl daemon-reload
+  systemctl enable --now static-route.service
+%{endif~}
